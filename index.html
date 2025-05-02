@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tamagotchi Pokémon</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #f0f0f0;
+    }
+    .container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .bar-container {
+      width: 200px;
+      background: #ccc;
+      margin: 10px auto;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .hp-bar {
+      height: 20px;
+      transition: width 0.3s;
+    }
+    #log {
+      margin: 20px auto;
+      width: 60%;
+      max-height: 200px;
+      overflow-y: auto;
+      background: #fff;
+      padding: 10px;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+      text-align: left;
+    }
+    button {
+  margin: 5px;
+  padding: 10px 20px;
+  font-size: 16px;
+  transition: background-color 0.3s, transform 0.3s;
+}
+    .button-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+  }
+
+  .hp-bar {
+    height: 20px;
+    transition: width 0.5s ease-in-out;
+  }
+</style>
+</head>
+<body>
+  <div id="introScreen" class="container">
+    <img src="https://i.imgur.com/SNJtbav.png" alt="Intro" style="max-width: 90%; height: auto; margin-bottom: 20px;" />
+    <h1>Benvenuto al Centro Pokémon del Parco di Pampini!</h1>
+    <p>Sono il Professor Elm. Durante il matrimonio ho trovato delle uova vicino al tavolo di Mogania. Vuoi adottarne uno e prendertene cura?</p>
+    <button onclick="startGame()">Inizia</button>
+  </div>
+
+  <div id="pokemonStatus" class="container" style="display:none;">
+    <img id="pokemonImage" src="" alt="Pokémon" style="width: 150px; display: none;" />
+    <h2 id="pokemonName"></h2>
+
+    <div>Salute</div>
+    <div id="healthStatus" style="font-size: 0.9em; margin-bottom: 5px;"></div>
+    <div class="bar-container"><div id="pokemonHealth" class="hp-bar" style="width:100%; background-color:#4caf50;"></div></div>
+    <div>Felicità</div>
+    <div id="happinessStatus" style="font-size: 0.9em; margin-bottom: 5px;"></div>
+    <div class="bar-container"><div id="pokemonHappiness" class="hp-bar" style="width:100%; background-color:#4caf50;"></div></div>
+    <div>Fame</div>
+    <div id="hungerStatus" style="font-size: 0.9em; margin-bottom: 5px;"></div>
+    <div class="bar-container"><div id="pokemonHunger" class="hp-bar" style="width:0%; background-color:#4caf50;"></div></div>
+    <div>Energia</div>
+    <div id="energyStatus" style="font-size: 0.9em; margin-bottom: 5px;"></div>
+    <div class="bar-container"><div id="pokemonEnergy" class="hp-bar" style="width:100%; background-color:#4caf50;"></div></div>
+    <div>Affetto</div>
+    <div id="affectionStatus" style="font-size: 0.9em; margin-bottom: 5px;"></div>
+    <div class="bar-container"><div id="pokemonAffection" class="hp-bar" style="width:0%; background-color:#4caf50;"></div></div>
+
+    <div>Livello: <span id="levelText">1</span></div>
+    <div id="log"></div>
+<div class="button-row">
+  <button onclick="restPokemon()">Fallo riposare</button>
+    <button onclick="feedPokemon()">Dai da mangiare</button>
+    <button onclick="playWithPokemon()">Gioca con lui</button>
+    <button onclick="goForWalk()">Passeggiata</button>
+    <button onclick="trainPokemon()">Allenati</button>
+    <button onclick="bringToCenter()">Porta al Centro Pokémon</button>
+    <button onclick="freePokemon()">Libera il Pokémon</button>
+</div>
+  </div>
+
+  <script>
+    let playerPokemon;
+    let happiness = 100;
+    let health = 100;
+    let hunger = 0;
+    let energy = 100;
+    let affection = 0;
+    let level = 1;
+let needsWalk = false;
+let walkTimer;
+
+    function startGame() {
+  startWalkTimer();
+      document.getElementById("introScreen").style.display = "none";
+      document.getElementById("pokemonStatus").style.display = "flex";
+      const pokemonList = ["Bergmite", "Snom", "Spheal"];
+      const randomIndex = Math.floor(Math.random() * pokemonList.length);
+      playerPokemon = { name: pokemonList[randomIndex], level: 1 };
+
+      const img = document.getElementById("pokemonImage");
+      img.src = `https://img.pokemondb.net/sprites/home/normal/${playerPokemon.name.toLowerCase()}.png`;
+      img.alt = playerPokemon.name;
+      img.style.display = "block";
+      document.getElementById("pokemonName").textContent = playerPokemon.name;
+
+      updateBars();
+    }
+
+    function clamp(v, min, max) {
+      return Math.min(Math.max(v, min), max);
+    }
+
+    function changeBarColor(barId, value) {
+      const el = document.getElementById(barId);
+      if (!el) return;
+      if (value >= 70) el.style.backgroundColor = '#4caf50';
+      else if (value >= 30) el.style.backgroundColor = '#ffeb3b';
+      else el.style.backgroundColor = '#f44336';
+    }
+
+    function updateBars() {
+  updateStatusMessages();
+      checkEvolution();
+      const stats = [
+        ["pokemonHealth", health],
+        ["pokemonHappiness", happiness],
+        ["pokemonHunger", hunger],
+        ["pokemonEnergy", energy],
+        ["pokemonAffection", affection]
+      ];
+
+      stats.forEach(([id, val]) => {
+        val = clamp(val, 0, 100);
+        document.getElementById(id).style.width = val + "%";
+        changeBarColor(id, val);
+      });
+
+      document.getElementById("levelText").textContent = level;
+    }
+
+    function log(msg) {
+      const l = document.getElementById("log");
+      l.innerHTML += `<div>${msg}</div>`;
+      l.scrollTop = l.scrollHeight;
+    }
+
+    function restPokemon() {
+      if (health <= 0) return log("Non può fare nulla, la salute è a 0!");
+      energy += 10;
+      health += 5;
+      hunger -= 5;
+      happiness -= 2;
+      updateBars();
+      log("Il tuo Pokémon si è riposato!");
+    }
+
+    function feedPokemon() {
+      if (health <= 0) return log("Non può fare nulla, la salute è a 0!");
+      hunger += 20;
+      happiness += 5;
+      energy -= 5;
+      health -= 2;
+      updateBars();
+      log("Hai dato da mangiare!");
+    }
+
+    function playWithPokemon() {
+      if (energy < 10) return log("È troppo stanco per giocare.");
+      energy -= 10;
+      happiness += 20;
+      affection += 1;
+      hunger -= 15;
+      updateBars();
+      log("Il tuo Pokémon ha giocato con te, è più felice e si affeziona!");
+      log("Il tuo Pokémon si è divertito giocando!");
+    }
+
+    function goForWalk() {
+  needsWalk = false;
+  startWalkTimer();
+      if (energy < 50 || hunger < 50) return log("Non può fare una passeggiata senza energia e cibo.");
+      energy -= 10;
+      hunger -= 10;
+      const event = Math.floor(Math.random() * 4) + 1;
+      if (event === 1) {
+        affection += 10;
+        log("Si è divertito tanto, affetto +10.");
+      } else if (event === 2) {
+  hunger = 0;
+  energy = 0;
+  health = 0;
+  updateBars();
+  log("Ha corso troppo e si è sfinito! Portalo al Centro Pokémon.");
+} else if (event === 3) {
+        level += 5;
+        log("Ha combattuto e guadagnato 5 livelli!");
+      } else {
+  log("Si è perso! Ti è stato assegnato un nuovo Pokémon.");
+  freePokemon();
+        log("Si è perso! Ti è stato assegnato un nuovo Pokémon.");
+        return;
+      }
+      updateBars();
+    }
+
+    function trainPokemon() {
+      if (energy < 50 || hunger < 50) return log("Non può allenarsi senza energia e cibo.");
+      energy -= 30;
+      hunger -= 30;
+      const healthLoss = Math.floor(Math.random() * 21) + 20; // da 20 a 40
+      health -= healthLoss;
+      happiness -= 20;
+      affection -= 5;
+      level++;
+      updateBars();
+      log("L'allenamento è stato intenso! Il tuo Pokémon ha guadagnato 1 livello ma ha perso molte energie.");
+      log("Si è allenato e ha guadagnato 1 livello!");
+    }
+
+    function bringToCenter() {
+      health = 100;
+      affection -= 20;
+      happiness -= 5;
+      energy -= 5;
+      updateBars();
+      log("È stato curato al Centro Pokémon.");
+    }
+
+    function freePokemon() {
+  const pokemonList = ["Bergmite", "Snom", "Spheal"];
+  const randomIndex = Math.floor(Math.random() * pokemonList.length);
+  playerPokemon = { name: pokemonList[randomIndex], level: 1, evolved: false };
+  affection = 0;
+  happiness = 50;
+  hunger = 0;
+  energy = 100;
+  health = 100;
+  level = 1;
+  const img = document.getElementById("pokemonImage");
+  img.src = `https://img.pokemondb.net/sprites/home/normal/${playerPokemon.name.toLowerCase()}.png`;
+  img.alt = playerPokemon.name;
+  document.getElementById("pokemonName").textContent = playerPokemon.name;
+  log("Hai ricevuto un nuovo Pokémon!");
+  updateBars();
+}
+
+    function checkEvolution() {
+      if (!playerPokemon || playerPokemon.evolved) return;
+      const name = playerPokemon.name;
+      if (name === "Snom" && affection >= 80) evolvePokemon("Frosmoth");
+      else if (name === "Spheal" && level >= 32) evolvePokemon("Sealeo");
+      else if (name === "Sealeo" && level >= 44) evolvePokemon("Walrein");
+      else if (name === "Bergmite" && level >= 37) evolvePokemon("Avalugg");
+    }
+
+    function evolvePokemon(newName) {
+      log(`🎉 ${playerPokemon.name} si è evoluto in ${newName}!`);
+      playerPokemon.name = newName;
+      playerPokemon.evolved = true;
+      document.getElementById("pokemonName").textContent = newName;
+      document.getElementById("pokemonImage").src = `https://img.pokemondb.net/sprites/home/normal/${newName.toLowerCase()}.png`;
+    }
+    function updateStatusMessages() {
+    const hungerText = document.getElementById("hungerStatus");
+    const energyText = document.getElementById("energyStatus");
+    const healthText = document.getElementById("healthStatus");
+    const happinessText = document.getElementById("happinessStatus");
+    const affectionText = document.getElementById("affectionStatus");
+
+    if (hungerText) hungerText.textContent = hunger >= 70 ? "È sazio." : hunger <= 30 ? "È affamato." : "Ha un po' di fame.";
+    if (energyText) energyText.textContent = energy >= 70 ? "È pieno di energie." : energy <= 30 ? "È molto stanco." : "È un po' stanco.";
+    if (healthText) healthText.textContent = health >= 70 ? "È in ottima salute." : health <= 30 ? "È molto debole." : "Sta abbastanza bene.";
+    if (happinessText) happinessText.textContent = happiness >= 70 ? "È felicissimo!" : happiness <= 30 ? "È triste." : "È tranquillo.";
+    if (affectionText) affectionText.textContent = affection >= 70 ? "Ti vuole molto bene." : affection <= 30 ? "Non ti conosce ancora bene." : "Sta iniziando ad affezionarsi.";
+  }
+function startWalkTimer() {
+  clearInterval(walkTimer);
+  walkTimer = setInterval(() => {
+    if (!needsWalk) {
+      needsWalk = true;
+      log("Il tuo Pokémon ha bisogno di sgranchirsi le zampe! Prova a fare una passeggiata.");
+    }
+  }, 60000); // ogni 60 secondi
+}
+</script>
+</body>
+</html>
